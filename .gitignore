@@ -1,0 +1,5 @@
+node_modules
+*.map
+coverage
+dist
+.DS_Store
