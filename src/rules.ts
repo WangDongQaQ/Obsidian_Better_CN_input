@@ -23,7 +23,17 @@ export interface Replacement {
     | "selection-wrap";
 }
 
+export interface RuleOptions {
+  keyEquivalents: boolean;
+  selectionWrapping: boolean;
+}
+
 type EditorText = Pick<Text, "lineAt">;
+
+const DEFAULT_RULE_OPTIONS: RuleOptions = {
+  keyEquivalents: true,
+  selectionWrapping: true,
+};
 
 const MARKDOWN_KEY_MAP: Record<string, string> = {
   "＃": "#",
@@ -40,13 +50,20 @@ const SELECTION_WRAPPERS: Record<string, [string, string]> = {
 export function collectKeyEquivalentChanges(
   doc: EditorText,
   changes: InputChange[],
+  options: RuleOptions = DEFAULT_RULE_OPTIONS,
 ): Replacement[] {
   const replacements: Replacement[] = [];
 
   for (const change of changes) {
-    const selectionWrap = getSelectionWrapChange(change);
-    if (selectionWrap) {
-      replacements.push(selectionWrap);
+    if (options.selectionWrapping) {
+      const selectionWrap = getSelectionWrapChange(change);
+      if (selectionWrap) {
+        replacements.push(selectionWrap);
+        continue;
+      }
+    }
+
+    if (!options.keyEquivalents) {
       continue;
     }
 

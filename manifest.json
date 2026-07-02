@@ -1,7 +1,7 @@
 {
   "id": "better-cn-input",
   "name": "Better CN Input",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
   "description": "Make Chinese IME punctuation work like Markdown keys and select the current paragraph with Cmd+A.",
   "author": "",

@@ -120,6 +120,34 @@ describe("Chinese Markdown key equivalents", () => {
     ]);
   });
 
+  it("honors rule toggles", () => {
+    expect(
+      collectKeyEquivalentChanges(doc("》 "), [input("》 ")], {
+        keyEquivalents: false,
+        selectionWrapping: true,
+      }),
+    ).toEqual([]);
+    expect(
+      collectKeyEquivalentChanges(
+        doc("·"),
+        [
+          {
+            fromA: 0,
+            toA: 4,
+            fromB: 0,
+            toB: 1,
+            text: "·",
+            replacedText: "输入内容",
+          },
+        ],
+        {
+          keyEquivalents: true,
+          selectionWrapping: false,
+        },
+      ),
+    ).toEqual([]);
+  });
+
   it("normalizes selected pasted text on command, not automatically on paste", () => {
     expect(
       normalizeSelectedText(
