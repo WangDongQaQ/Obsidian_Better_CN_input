@@ -10,11 +10,19 @@ import {
   type App,
   type Editor,
   type EditorPosition,
+  type Menu,
   Notice,
   Plugin,
   PluginSettingTab,
+  requestUrl,
   Setting,
 } from "obsidian";
+import {
+  fallbackTitle,
+  findUrlTarget,
+  formatMarkdownLink,
+  titleFromHtml,
+} from "./link";
 import {
   collectKeyEquivalentChanges,
   normalizeSelectedText,
@@ -29,6 +37,7 @@ interface BetterCnInputSettings {
   selectionWrapping: boolean;
   normalizeCommand: boolean;
   paragraphSelection: boolean;
+  linkTitleConversion: boolean;
 }
 
 const DEFAULT_SETTINGS: BetterCnInputSettings = {
@@ -36,6 +45,7 @@ const DEFAULT_SETTINGS: BetterCnInputSettings = {
   selectionWrapping: true,
   normalizeCommand: true,
   paragraphSelection: true,
+  linkTitleConversion: true,
 };
 
 export default class BetterCnInputPlugin extends Plugin {
@@ -67,6 +77,29 @@ export default class BetterCnInputPlugin extends Plugin {
         this.normalizeSelection(editor);
       },
     });
+    this.addCommand({
+      id: "convert-url-to-title-link",
+      name: "解析链接为 Markdown 超链接",
+      editorCallback: (editor) => {
+        void this.convertUrlToTitleLink(editor);
+      },
+    });
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor) => {
+        if (!this.settings.linkTitleConversion || !findUrlTarget(editor)) {
+          return;
+        }
+
+        menu.addItem((item) => {
+          item
+            .setTitle("解析链接为 Markdown 超链接")
+            .setIcon("link")
+            .onClick(() => {
+              void this.convertUrlToTitleLink(editor);
+            });
+        });
+      }),
+    );
   }
 
   async loadSettings(): Promise<void> {
@@ -169,6 +202,49 @@ export default class BetterCnInputPlugin extends Plugin {
     editor.transaction({ changes }, "chinese-markdown-input");
     new Notice("已调整选中文本中的中文 Markdown 标点");
   }
+
+  private async convertUrlToTitleLink(editor: Editor): Promise<void> {
+    if (!this.settings.linkTitleConversion) {
+      new Notice("已关闭链接标题解析");
+      return;
+    }
+
+    const target = findUrlTarget(editor);
+    if (!target) {
+      new Notice("没有找到可解析的 URL");
+      return;
+    }
+
+    const loading = new Notice("正在解析链接标题...", 0);
+    try {
+      const title = await this.resolveLinkTitle(target.url);
+      editor.replaceRange(
+        formatMarkdownLink(title, target.url),
+        target.from,
+        target.to,
+        "better-cn-input-link",
+      );
+      new Notice(`已转换为：${title}`);
+    } finally {
+      loading.hide();
+    }
+  }
+
+  private async resolveLinkTitle(url: string): Promise<string> {
+    try {
+      const response = await requestUrl({
+        url,
+        throw: false,
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+        },
+      });
+
+      return titleFromHtml(response.text) ?? fallbackTitle(url);
+    } catch {
+      return fallbackTitle(url);
+    }
+  }
 }
 
 class BetterCnInputSettingTab extends PluginSettingTab {
@@ -227,6 +303,18 @@ class BetterCnInputSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.paragraphSelection)
           .onChange(async (value) => {
             this.plugin.settings.paragraphSelection = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("链接标题解析")
+      .setDesc("将选中或光标所在的 URL 解析为 [网页标题](URL)。")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.linkTitleConversion)
+          .onChange(async (value) => {
+            this.plugin.settings.linkTitleConversion = value;
             await this.plugin.saveSettings();
           }),
       );
