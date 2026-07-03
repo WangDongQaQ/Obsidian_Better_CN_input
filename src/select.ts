@@ -14,6 +14,10 @@ function isBlank(text: string): boolean {
   return text.trim().length === 0;
 }
 
+function endsWithHardBreak(text: string): boolean {
+  return / {2,}$/u.test(text);
+}
+
 export function paragraphAt(doc: Text, pos: number): SelectionRange | null {
   if (doc.length === 0) return null;
 
@@ -21,12 +25,20 @@ export function paragraphAt(doc: Text, pos: number): SelectionRange | null {
   if (isBlank(line.text)) return null;
 
   let fromLine = line.number;
-  while (fromLine > 1 && !isBlank(doc.line(fromLine - 1).text)) {
+  while (
+    fromLine > 1 &&
+    !isBlank(doc.line(fromLine - 1).text) &&
+    !endsWithHardBreak(doc.line(fromLine - 1).text)
+  ) {
     fromLine -= 1;
   }
 
   let toLine = line.number;
-  while (toLine < doc.lines && !isBlank(doc.line(toLine + 1).text)) {
+  while (
+    toLine < doc.lines &&
+    !isBlank(doc.line(toLine + 1).text) &&
+    !endsWithHardBreak(doc.line(toLine).text)
+  ) {
     toLine += 1;
   }
 
