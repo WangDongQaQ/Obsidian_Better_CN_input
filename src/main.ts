@@ -17,6 +17,7 @@ import {
   requestUrl,
   Setting,
 } from "obsidian";
+import { birthdaysOn, dateFromDailyNotePath } from "./birthdays";
 import {
   fallbackTitle,
   findUrlTarget,
@@ -38,6 +39,7 @@ interface BetterCnInputSettings {
   normalizeCommand: boolean;
   paragraphSelection: boolean;
   linkTitleConversion: boolean;
+  birthdayCalendarUrl: string;
 }
 
 const DEFAULT_SETTINGS: BetterCnInputSettings = {
@@ -46,6 +48,7 @@ const DEFAULT_SETTINGS: BetterCnInputSettings = {
   normalizeCommand: true,
   paragraphSelection: true,
   linkTitleConversion: true,
+  birthdayCalendarUrl: "",
 };
 
 export default class BetterCnInputPlugin extends Plugin {
@@ -100,6 +103,9 @@ export default class BetterCnInputPlugin extends Plugin {
         });
       }),
     );
+    this.registerMarkdownCodeBlockProcessor("better-cn-birthdays", (_source, el, ctx) => {
+      void this.renderBirthdays(el, ctx.sourcePath);
+    });
   }
 
   async loadSettings(): Promise<void> {
@@ -245,6 +251,40 @@ export default class BetterCnInputPlugin extends Plugin {
       return fallbackTitle(url);
     }
   }
+
+  private async renderBirthdays(el: HTMLElement, sourcePath: string): Promise<void> {
+    el.empty();
+
+    if (!this.settings.birthdayCalendarUrl.trim()) {
+      el.createEl("p", { text: "未配置生日日历 ICS URL" });
+      return;
+    }
+
+    el.createEl("p", { text: "正在读取生日..." });
+
+    try {
+      const response = await requestUrl({
+        url: this.settings.birthdayCalendarUrl.trim(),
+        throw: false,
+      });
+      const date = dateFromDailyNotePath(sourcePath);
+      const names = birthdaysOn(response.text, date);
+
+      el.empty();
+      if (names.length === 0) {
+        el.createEl("p", { text: "今天没有生日" });
+        return;
+      }
+
+      const list = el.createEl("ul");
+      for (const name of names) {
+        list.createEl("li", { text: name });
+      }
+    } catch {
+      el.empty();
+      el.createEl("p", { text: "生日读取失败" });
+    }
+  }
 }
 
 class BetterCnInputSettingTab extends PluginSettingTab {
@@ -315,6 +355,19 @@ class BetterCnInputSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.linkTitleConversion)
           .onChange(async (value) => {
             this.plugin.settings.linkTitleConversion = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("生日日历 ICS URL")
+      .setDesc("Google Calendar 的 Secret address in iCal format；用于 better-cn-birthdays 代码块。")
+      .addText((text) =>
+        text
+          .setPlaceholder("https://calendar.google.com/calendar/ical/...")
+          .setValue(this.plugin.settings.birthdayCalendarUrl)
+          .onChange(async (value) => {
+            this.plugin.settings.birthdayCalendarUrl = value.trim();
             await this.plugin.saveSettings();
           }),
       );
