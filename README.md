@@ -110,3 +110,5 @@ For example:
 ```text
 <vault>/.obsidian/plugins/better-cn-input/
 ```
+
+移动端也只需要同步这个安装目录。不要把整个源码仓库、`.git` 或 `node_modules` 放进 `.obsidian/plugins`，否则 Obsidian 和 iCloud 会扫描大量开发文件，启动和手机同步都会变慢。
